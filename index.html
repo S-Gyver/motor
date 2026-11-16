@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibration Bot – หุ่นยนต์เดินได้จากไม้ไอติม</title>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Mitr',sans-serif;overflow:hidden;background:#1e1b4b}
+.slide{position:absolute;inset:0;padding:4vh 5vw 13vh;display:none;flex-direction:column;color:#2d3436;overflow-y:auto}
+.slide.active{display:flex;animation:fadeIn .5s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(25px)}to{opacity:1;transform:none}}
+h1{font-size:clamp(2.6rem,6vw,5.2rem);line-height:1.15}
+h2{font-size:clamp(2rem,4vw,3.3rem);margin-bottom:2vh;line-height:1.2}
+h3{font-size:clamp(1.4rem,2.5vw,2.1rem);margin-bottom:1vh}
+p,li{font-size:clamp(1.15rem,2.1vw,1.75rem);line-height:1.55}
+ul{padding-left:1.2em}
+.tag{display:inline-block;align-self:flex-start;background:#fff;padding:.25em 1em;border-radius:999px;font-weight:600;font-size:clamp(1rem,1.6vw,1.3rem);margin-bottom:1.5vh;box-shadow:0 4px 0 rgba(0,0,0,.15)}
+.card{background:#fff;border-radius:24px;padding:2.2vh 2vw;box-shadow:0 8px 0 rgba(0,0,0,.12)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:2vw}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5vw}
+.btn{font-family:inherit;font-size:clamp(1.1rem,1.8vw,1.5rem);font-weight:600;padding:.45em 1.3em;border:none;border-radius:999px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.25);transition:transform .1s;color:#fff}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.big-emoji{font-size:clamp(2.5rem,5vw,4.5rem)}
+.hl{background:#ffeaa7;padding:0 .25em;border-radius:6px}
+.warn{background:#ff7675;color:#fff;border-radius:20px;padding:2vh 2vw;font-weight:600;box-shadow:0 8px 0 #d63031}
+.warn p{font-size:clamp(1.2rem,2.2vw,1.8rem)}
+
+/* ---------- ROBOT ---------- */
+.stage{position:relative;height:230px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+.walker{position:relative}
+.bot{position:relative;width:210px;height:200px}
+.bot .stick{position:absolute;left:20px;top:92px;width:165px;height:22px;background:#f5d199;border:3px solid #b8894a;border-radius:11px}
+.bot .leg{position:absolute;top:104px;width:20px;height:92px;background:#f5d199;border:3px solid #b8894a;border-radius:10px;transform-origin:top center;transform:rotate(14deg)}
+.bot .leg.a{left:40px}.bot .leg.b{left:145px}
+.bot .motor{position:absolute;left:62px;top:44px;width:84px;height:50px;background:linear-gradient(#dfe6e9,#8395a7);border:3px solid #576574;border-radius:12px;transition:.3s}
+.bot .eye{position:absolute;top:12px;width:20px;height:20px;background:#fff;border:2px solid #2d3436;border-radius:50%}
+.bot .eye::after{content:'';position:absolute;width:8px;height:8px;background:#2d3436;border-radius:50%;top:5px;left:6px}
+.bot .eye.l{left:14px}.bot .eye.r{left:46px}
+.bot .shaft{position:absolute;left:144px;top:64px;width:18px;height:8px;background:#576574}
+.bot .capwrap{position:absolute;left:164px;top:68px;width:0;height:0}
+.bot .cap{position:absolute;width:44px;height:44px;left:-8px;top:-8px;border-radius:50%;background:#0984e3;border:4px solid #055a9c}
+.bot .wire{position:absolute;top:36px;left:80px;width:50px;height:20px;border:3px solid #d63031;border-bottom:none;border-radius:20px 20px 0 0}
+.smoke{position:absolute;left:80px;top:10px;font-size:2.2rem;opacity:0;pointer-events:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shake{0%{transform:translate(0,0) rotate(0)}25%{transform:translate(3px,-4px) rotate(1deg)}50%{transform:translate(-2px,1px) rotate(-1deg)}75%{transform:translate(2px,-3px) rotate(.5deg)}100%{transform:translate(0,0)}}
+@keyframes walk{from{transform:translateX(-140px)}to{transform:translateX(140px)}}
+@keyframes puff{0%{opacity:0;transform:translateY(0) scale(.6)}30%{opacity:1}100%{opacity:0;transform:translateY(-70px) scale(1.4)}}
+.run .capwrap{animation:spin .15s linear infinite}
+.run .bot{animation:shake .08s infinite}
+.run .walker{animation:walk 3.5s ease-in-out infinite alternate}
+.weak .capwrap{animation:spin 2.5s linear infinite}
+.over .capwrap{animation:spin .05s linear infinite}
+.over .bot{animation:shake .04s infinite}
+.over .motor{background:#ff7675;box-shadow:0 0 35px #ff3b3b}
+.over .smoke,.dead .smoke{animation:puff 1.2s infinite}
+.over .smoke.s2,.dead .smoke.s2{animation-delay:.6s;left:110px}
+.dead .bot{filter:grayscale(1) brightness(.6)}
+
+/* ---------- SLIDE 1 ---------- */
+#s1{background:linear-gradient(135deg,#ffeaa7,#fd79a8);align-items:center;justify-content:center;text-align:center}
+#s1 h1{color:#fff;text-shadow:0 5px 0 #e84393}
+#s1 .sub{font-size:clamp(1.5rem,3vw,2.6rem);font-weight:600;background:#fff;color:#e84393;padding:.3em 1.1em;border-radius:999px;margin:3vh 0;box-shadow:0 6px 0 rgba(0,0,0,.15)}
+#s1 .stage{width:min(700px,90vw);height:240px}
+.floor{position:absolute;bottom:0;left:0;right:0;height:6px;background:rgba(0,0,0,.15);border-radius:3px}
+
+/* ---------- SLIDE 2 ---------- */
+#s2{background:linear-gradient(135deg,#a1ffce,#faffd1)}
+.compare .stage2{position:relative;height:200px;display:flex;align-items:center;justify-content:center}
+.rig{position:relative;width:200px;height:150px}
+.rig .base{position:absolute;bottom:0;left:10px;width:180px;height:20px;background:#f5d199;border:3px solid #b8894a;border-radius:10px}
+.rig .mbox{position:absolute;left:30px;top:45px;width:90px;height:60px;background:linear-gradient(#dfe6e9,#8395a7);border:3px solid #576574;border-radius:12px}
+.rig .capwrap{position:absolute;left:145px;top:75px;width:0;height:0}
+.rig .cap{position:absolute;width:64px;height:64px;border-radius:50%;background:#0984e3;border:5px solid #055a9c}
+.rig .cap::after{content:'';position:absolute;width:12px;height:12px;background:#fff;border-radius:50%;top:6px;left:21px}
+.rig .cap.center{left:-32px;top:-32px}
+.rig .cap.offc{left:-10px;top:-10px}
+.rig .axle{position:absolute;left:141px;top:71px;width:8px;height:8px;background:#2d3436;border-radius:50%;z-index:2}
+#rigs.on .capwrap{animation:spin .25s linear infinite}
+#rigs.on .rig.shaky{animation:shake .07s infinite}
+.verdict{text-align:center;font-weight:600;margin-top:1vh}
+.steps{display:flex;align-items:stretch;gap:1vw;margin-top:2vh}
+.step{flex:1;background:#fff;border-radius:20px;padding:1.5vh 1vw;text-align:center;box-shadow:0 6px 0 rgba(0,0,0,.12)}
+.step .n{display:inline-block;width:2em;height:2em;line-height:2em;border-radius:50%;background:#00b894;color:#fff;font-weight:700;font-size:clamp(1rem,1.6vw,1.4rem)}
+.arrow{align-self:center;font-size:clamp(2rem,3vw,3rem);color:#00b894;font-weight:700}
+
+/* ---------- SLIDE 3 ---------- */
+#s3{background:linear-gradient(135deg,#a8edea,#fed6e3)}
+.flow{display:flex;align-items:center;justify-content:center;gap:2vw;flex-wrap:wrap;margin:1vh 0 3vh}
+.flow .box{background:#fff;border-radius:24px;padding:2vh 2vw;text-align:center;min-width:200px;box-shadow:0 8px 0 rgba(0,0,0,.12)}
+.flow .box p{font-weight:600}
+.pole{display:inline-flex;align-items:center;justify-content:center;width:1.6em;height:1.6em;border-radius:50%;color:#fff;font-weight:700;font-size:clamp(1.4rem,2.4vw,2rem)}
+.pole.p{background:#d63031}.pole.m{background:#2d3436}
+
+/* ---------- SLIDE 4 ---------- */
+#s4{background:linear-gradient(135deg,#d4fc79,#96e6a1)}
+.motorviz{position:relative;width:300px;height:300px;margin:0 auto;border-radius:50%;background:#fff;border:8px solid #576574;box-shadow:0 8px 0 rgba(0,0,0,.15)}
+.magnet{position:absolute;top:50px;width:60px;height:185px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:2.4rem;font-weight:700}
+.magnet.n{left:8px;background:#d63031;border-radius:150px 0 0 150px}
+.magnet.s{right:8px;background:#0984e3;border-radius:0 150px 150px 0}
+.rotor{position:absolute;left:50%;top:50%;width:150px;height:46px;margin:-23px 0 0 -75px;border-radius:12px;background:repeating-linear-gradient(90deg,#e17055 0 8px,#fab1a0 8px 12px);border:3px solid #a0522d;animation:spin 1.2s linear infinite;display:flex;justify-content:space-between;align-items:center;padding:0 6px;color:#fff;font-weight:700;font-size:1.3rem}
+.rotor.rev{animation-direction:reverse}
+.rotor::after{content:'';position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px;background:#2d3436;border-radius:50%}
+.batt{display:inline-flex;align-items:center;gap:.4em;font-size:clamp(2rem,3vw,2.6rem);transition:.3s}
+.batt.flip{flex-direction:row-reverse}
+.rule{display:flex;align-items:center;gap:.6em;margin:.6vh 0}
+.mag{display:inline-block;padding:.1em .5em;border-radius:8px;color:#fff;font-weight:700}
+.mag.N{background:#d63031}.mag.S{background:#0984e3}
+
+/* ---------- SLIDE 5 ---------- */
+#s5{background:linear-gradient(135deg,#ffecd2,#fcb69f)}
+.vbtns{display:flex;gap:1vw;flex-wrap:wrap;justify-content:center;margin:1vh 0}
+.vbtns .btn{opacity:.6}
+.vbtns .btn.sel{opacity:1;outline:4px solid #fff}
+.meter{height:28px;background:#fff;border-radius:999px;overflow:hidden;border:3px solid #2d3436}
+.meter .fill{height:100%;width:0;transition:width .6s,background .6s}
+#vStatus{font-size:clamp(1.4rem,2.6vw,2.2rem);font-weight:700;text-align:center;margin-top:1vh}
+
+/* ---------- SLIDE 6 ---------- */
+#s6{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+#s6 .card{color:#2d3436}
+.hint{display:none;margin-top:1.5vh;background:#fff9e6;border-radius:16px;padding:1.5vh 1.5vw;border:3px dashed #fdcb6e}
+.hint.show{display:block;animation:fadeIn .4s}
+.timer{display:flex;align-items:center;gap:1vw;justify-content:center;margin-top:2.5vh;flex-wrap:wrap}
+#timer{font-size:clamp(2rem,4vw,3.4rem);font-weight:700;background:#fff;color:#764ba2;padding:.1em .8em;border-radius:20px;min-width:4.5em;text-align:center}
+
+/* ---------- NAV ---------- */
+.nav{position:fixed;bottom:0;left:0;right:0;height:10vh;min-height:60px;display:flex;align-items:center;justify-content:center;gap:2vw;background:rgba(0,0,0,.25);backdrop-filter:blur(6px);z-index:10}
+.nav .btn{background:#fff;color:#2d3436}
+#dots{display:flex;gap:10px}
+.dot{width:16px;height:16px;border-radius:50%;border:none;background:rgba(255,255,255,.5);cursor:pointer}
+.dot.on{background:#fff;transform:scale(1.35)}
+#count{color:#fff;font-weight:600;font-size:1.2rem;min-width:60px;text-align:center}
+@media (max-width:800px){.grid2,.grid3{grid-template-columns:1fr}.steps{flex-direction:column}.arrow{transform:rotate(90deg)}}
+</style>
+</head>
+<body>
+
+<!-- ========== SLIDE 1 ========== -->
+<section class="slide active" id="s1">
+  <div class="tag">🔧 วิทยาการคำนวณ / วิทยาศาสตร์ ม.1</div>
+  <h1>หุ่นยนต์เดินได้จากไม้ไอติม<br>(Vibration Bot)</h1>
+  <div class="sub">ไม่มีล้อ ไม่มีข้อต่อ แต่เดินได้ยังไง? 🤔</div>
+  <div class="stage run">
+    <div class="walker"><div class="bot">
+      <div class="wire"></div>
+      <div class="motor"><div class="eye l"></div><div class="eye r"></div></div>
+      <div class="shaft"></div><div class="capwrap"><div class="cap"></div></div>
+      <div class="stick"></div><div class="leg a"></div><div class="leg b"></div>
+    </div></div>
+    <div class="floor"></div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 2 ========== -->
+<section class="slide" id="s2">
+  <div class="tag">⚙️ กลไกการขยับ</div>
+  <h2>ทำไมถึงเดินได้? ความลับคือ <span class="hl">“ฝาเบี้ยว”</span>!</h2>
+  <div class="grid2 compare" id="rigs">
+    <div class="card">
+      <h3>😐 ติดฝาตรงกลาง</h3>
+      <div class="stage2"><div class="rig"><div class="base"></div><div class="mbox"></div><div class="axle"></div><div class="capwrap"><div class="cap center"></div></div></div></div>
+      <p class="verdict">น้ำหนักสมดุล → หมุนเฉยๆ ตัวนิ่ง</p>
+    </div>
+    <div class="card">
+      <h3>🤪 ติดฝาเยื้องศูนย์</h3>
+      <div class="stage2"><div class="rig shaky"><div class="base"></div><div class="mbox"></div><div class="axle"></div><div class="capwrap"><div class="cap offc"></div></div></div></div>
+      <p class="verdict">น้ำหนักไม่สมดุล → สั่นดุ๊กดิ๊ก!</p>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:2vh">
+    <button class="btn" style="background:#00b894" onclick="toggleRigs(this)">▶ เปิดมอเตอร์</button>
+  </div>
+  <div class="grid2" style="margin-top:2.5vh">
+    <div class="card"><p>🧺 <b>เหมือนเครื่องซักผ้า</b> ที่ผ้ากองอยู่ฝั่งเดียว พอปั่นแล้วทั้งเครื่องสั่นโครมคราม</p></div>
+    <div class="card"><p>📱 <b>เหมือนมือถือ</b> ที่เปิดระบบสั่นแล้วค่อยๆ ไถลไปบนโต๊ะเอง</p></div>
+  </div>
+  <div class="steps">
+    <div class="step"><span class="n">1</span><p>มอเตอร์หมุน<br><b>ฝาเบี้ยว</b></p></div>
+    <div class="arrow">➜</div>
+    <div class="step"><span class="n">2</span><p>เกิด <b>แรงสั่น</b><br>ส่งลงขาไม้ไอติม</p></div>
+    <div class="arrow">➜</div>
+    <div class="step"><span class="n">3</span><p>ขา <b>กระโดดถี่ๆ</b><br>ดันหุ่นไถลไปข้างหน้า</p></div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 3 ========== -->
+<section class="slide" id="s3">
+  <div class="tag">🔋 รู้จักพระเอกของเรา</div>
+  <h2>มอเตอร์ DC คืออะไร?</h2>
+  <div class="card" style="text-align:center;margin-bottom:2vh">
+    <p style="font-size:clamp(1.6rem,3vw,2.6rem);font-weight:700">มอเตอร์ = <span class="hl">“ตัวเปลี่ยนพลังงาน”</span> 🔄</p>
+  </div>
+  <div class="flow">
+    <div class="box"><div class="big-emoji">⚡</div><p>พลังงานไฟฟ้า</p></div>
+    <div class="arrow" style="color:#e84393">➜</div>
+    <div class="box"><div class="big-emoji">⚙️</div><p>มอเตอร์</p></div>
+    <div class="arrow" style="color:#e84393">➜</div>
+    <div class="box"><div class="big-emoji">🌀</div><p>พลังงานกล<br>(การหมุน)</p></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>DC = ไฟกระแสตรง</h3>
+      <p>ไฟจาก <b>ถ่านไฟฉาย</b> 🔋 ไหลไปทางเดียว เหมือน <b>ถนนวันเวย์</b> 🚗➡️</p>
+      <p style="margin-top:1vh">มีขั้วชัดเจน: <span class="pole p">+</span> บวก &nbsp; <span class="pole m">−</span> ลบ</p>
+      <p style="margin-top:1vh">🔍 เจอมอเตอร์ได้ใน: พัดลมมือถือ รถบังคับ แปรงสีฟันไฟฟ้า</p>
+    </div>
+    <div class="warn">
+      <div class="big-emoji">⛔🔌</div>
+      <p>ห้ามเอามอเตอร์ไปต่อกับ <u>ปลั๊กไฟบ้าน</u> เด็ดขาด!</p>
+      <p style="font-weight:400;margin-top:1vh">ไฟบ้านแรงถึง 220V แรงกว่าถ่านก้อนเป็นร้อยเท่า ทั้งมอเตอร์พัง และ <b>อันตรายถึงชีวิต</b></p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 4 ========== -->
+<section class="slide" id="s4">
+  <div class="tag">🧲 ส่องข้างในมอเตอร์</div>
+  <h2>มอเตอร์ทำงานได้ยังไง?</h2>
+  <div class="grid2" style="align-items:center">
+    <div style="text-align:center">
+      <div class="motorviz">
+        <div class="magnet n">N</div><div class="magnet s">S</div>
+        <div class="rotor" id="rotor"><span>N</span><span>S</span></div>
+      </div>
+      <p style="margin-top:1.5vh;font-weight:600" id="dirText">↻ หมุนตามเข็มนาฬิกา</p>
+      <div style="margin-top:1vh;display:flex;align-items:center;justify-content:center;gap:1.5vw;flex-wrap:wrap">
+        <div class="batt" id="batt"><span class="pole p">+</span><span>🔋</span><span class="pole m">−</span></div>
+        <button class="btn" style="background:#6c5ce7" onclick="flip()">🔀 สลับสาย + / −</button>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:1.5vh">
+        <p>🔴🔵 <b>แม่เหล็กถาวร</b> ติดอยู่รอบนอก (อยู่นิ่งๆ)</p>
+        <p>🟠 <b>ขดลวดทองแดง</b> พันอยู่ที่แกนตรงกลาง</p>
+      </div>
+      <div class="card" style="margin-bottom:1.5vh">
+        <p>⚡ ปล่อยไฟเข้า → ขดลวดกลายเป็น <span class="hl"><b>แม่เหล็กไฟฟ้า</b></span></p>
+        <div class="rule"><span class="mag N">N</span><span class="mag N">N</span><p>ขั้วเหมือนกัน = <b>ผลัก</b> 👐</p></div>
+        <div class="rule"><span class="mag N">N</span><span class="mag S">S</span><p>ขั้วต่างกัน = <b>ดูด</b> 🤝</p></div>
+        <p>ผลัก-ดูด สลับกันไปเรื่อยๆ → แกนหมุนติ้วๆ 🌀</p>
+      </div>
+      <div class="card" style="background:#ffeaa7">
+        <p>💡 <b>ทริค:</b> สลับสายบวก-ลบ มอเตอร์จะ <b>หมุนกลับทาง</b>! ลองกดปุ่มดูสิ</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 5 ========== -->
+<section class="slide" id="s5">
+  <div class="tag">🔋 กำลังไฟ & ข้อควรระวัง</div>
+  <h2>โวลต์ (V) = <span class="hl">“แรงผลัก”</span> ของไฟฟ้า</h2>
+  <div class="grid2">
+    <div class="card">
+      <p>💦 เหมือน <b>แรงดันน้ำในสายยาง</b> บีบแรงไป น้ำพุ่งแรง บีบเบาไป น้ำไหลแค่ติ๋งๆ</p>
+      <p style="margin-top:1vh">✅ <b>สเปกที่เหมาะ:</b> ถ่าน 1.5V – 3V<br>(ถ่าน AA 1–2 ก้อน) กำลังพอดี!</p>
+    </div>
+    <div class="card">
+      <p style="font-weight:600;text-align:center">👇 ลองเลือกไฟให้หุ่นดู 👇</p>
+      <div class="vbtns">
+        <button class="btn" id="b-weak" style="background:#636e72" onclick="setV('weak')">😴 ถ่านอ่อน</button>
+        <button class="btn" id="b-good" style="background:#00b894" onclick="setV('good')">😎 3V พอดี</button>
+        <button class="btn" id="b-over" style="background:#d63031" onclick="setV('over')">🔥 9V เยอะไป</button>
+      </div>
+      <div class="meter"><div class="fill" id="vFill"></div></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:2vh">
+    <div class="stage" id="stage5">
+      <div class="walker"><div class="bot">
+        <span class="smoke">💨</span><span class="smoke s2">💨</span>
+        <div class="wire"></div>
+        <div class="motor"><div class="eye l"></div><div class="eye r"></div></div>
+        <div class="shaft"></div><div class="capwrap"><div class="cap"></div></div>
+        <div class="stick"></div><div class="leg a"></div><div class="leg b"></div>
+      </div></div>
+      <div class="floor"></div>
+    </div>
+    <div id="vStatus">กดปุ่มด้านบนเพื่อทดลอง 👆</div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 6 ========== -->
+<section class="slide" id="s6">
+  <div class="tag" style="color:#764ba2">🏆 กิจกรรมท้าทายท้ายคาบ</div>
+  <h2>MISSION: นักประดิษฐ์ตัวจริง!</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>🎯 ภารกิจที่ 1</h3>
+      <p>ปรับแต่งหุ่นยังไงให้ <b>เดินตรงที่สุด</b> ไม่เดินวนเป็นวงกลม?</p>
+      <button class="btn" style="background:#fdcb6e;color:#2d3436;margin-top:1.5vh" onclick="hint('h1',this)">💡 ดูคำใบ้</button>
+      <div class="hint" id="h1"><ul>
+        <li>วัดขาทุกข้างให้ <b>ยาวเท่ากัน</b> 📏</li>
+        <li>วางมอเตอร์และถ่านให้ <b>น้ำหนักอยู่กลางตัว</b> ⚖️</li>
+        <li>ดัดขาให้ <b>เอียงไปทางเดียวกัน</b></li>
+        <li>ลองขยับถ่านไปซ้าย-ขวา เพื่อถ่วงน้ำหนัก</li>
+      </ul></div>
+    </div>
+    <div class="card">
+      <h3>🔄 ภารกิจที่ 2</h3>
+      <p>ถ้าอยากให้หุ่น <b>เดินถอยหลัง</b> ต้องทำยังไงกับสายไฟ?</p>
+      <button class="btn" style="background:#fdcb6e;color:#2d3436;margin-top:1.5vh" onclick="hint('h2',this)">💡 ดูคำใบ้</button>
+      <div class="hint" id="h2"><ul>
+        <li>นึกถึงทริคสไลด์ที่แล้ว: <b>สลับสาย + / −</b> 🔀</li>
+        <li>มอเตอร์จะหมุนกลับทาง ทิศการสั่นก็เปลี่ยนด้วย</li>
+        <li>🧪 สังเกตให้ดี: หุ่นถอยหลังจริง หรือแค่หมุนวนกลับด้าน? แล้ว <b>มุมเอียงของขา</b> มีผลไหม?</li>
+      </ul></div>
+    </div>
+  </div>
+  <div class="timer">
+    <span style="font-size:1.5rem;font-weight:600">⏱️ เวลาทำภารกิจ:</span>
+    <button class="btn" style="background:#00b894" onclick="setTimer(5)">5 นาที</button>
+    <button class="btn" style="background:#0984e3" onclick="setTimer(10)">10 นาที</button>
+    <div id="timer">--:--</div>
+  </div>
+</section>
+
+<!-- ========== NAV ========== -->
+<div class="nav">
+  <button class="btn" onclick="go(cur-1)">◀ ก่อนหน้า</button>
+  <div id="dots"></div>
+  <span id="count">1 / 6</span>
+  <button class="btn" onclick="go(cur+1)">ถัดไป ▶</button>
+  <button class="btn" onclick="fs()" title="เต็มจอ">⛶</button>
+</div>
+
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+let cur=0;
+const dots=document.getElementById('dots');
+slides.forEach((s,i)=>{const d=document.createElement('button');d.className='dot'+(i===0?' on':'');d.onclick=()=>go(i);dots.appendChild(d)});
+function go(i){
+  if(i<0||i>=slides.length)return;
+  slides[cur].classList.remove('active');cur=i;slides[cur].classList.add('active');
+  [...dots.children].forEach((d,j)=>d.classList.toggle('on',j===cur));
+  document.getElementById('count').textContent=`${cur+1} / ${slides.length}`;
+}
+document.addEventListener('keydown',e=>{
+  if(['ArrowRight','PageDown'].includes(e.key)){e.preventDefault();go(cur+1)}
+  if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();go(cur-1)}
+});
+function fs(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}
+
+/* Slide 2 */
+function toggleRigs(btn){
+  const on=document.getElementById('rigs').classList.toggle('on');
+  btn.textContent=on?'⏹ ปิดมอเตอร์':'▶ เปิดมอเตอร์';
+  btn.style.background=on?'#d63031':'#00b894';
+}
+
+/* Slide 4 */
+let rev=false;
+function flip(){
+  rev=!rev;
+  document.getElementById('rotor').classList.toggle('rev',rev);
+  document.getElementById('batt').classList.toggle('flip',rev);
+  document.getElementById('dirText').textContent=rev?'↺ หมุนทวนเข็มนาฬิกา (กลับทางแล้ว!)':'↻ หมุนตามเข็มนาฬิกา';
+}
+
+/* Slide 5 */
+const cases={
+  weak:{cls:'weak',pct:12,color:'#b2bec3',text:'😴 ไฟน้อยไป: แรงผลักไม่พอ ฝาหมุนอืดๆ หุ่นไม่สั่นเลย'},
+  good:{cls:'run',pct:45,color:'#00b894',text:'😎 ไฟพอดี: สั่นแรงกำลังดี วิ่งฉิว!'},
+  over:{cls:'over',pct:100,color:'#d63031',text:'🔥 ไฟเยอะไป: มอเตอร์ร้อนจัด... ระวัง!'}
+};
+let deadT;
+function setV(k){
+  const c=cases[k],st=document.getElementById('stage5');
+  clearTimeout(deadT);
+  st.className='stage '+c.cls;
+  document.getElementById('vFill').style.width=c.pct+'%';
+  document.getElementById('vFill').style.background=c.color;
+  document.getElementById('vStatus').textContent=c.text;
+  ['weak','good','over'].forEach(x=>document.getElementById('b-'+x).classList.toggle('sel',x===k));
+  if(k==='over'){deadT=setTimeout(()=>{st.className='stage dead';document.getElementById('vStatus').textContent='💥 มอเตอร์ไหม้แล้ว! พังถาวร ใช้ต่อไม่ได้'},2500)}
+}
+
+/* Slide 6 */
+function hint(id,btn){const h=document.getElementById(id).classList.toggle('show');btn.textContent=h?'🙈 ซ่อนคำใบ้':'💡 ดูคำใบ้'}
+let tLeft=0,tInt=null;
+function renderT(){const m=String(Math.floor(tLeft/60)).padStart(2,'0'),s=String(tLeft%60).padStart(2,'0');document.getElementById('timer').textContent=`${m}:${s}`}
+function setTimer(min){
+  clearInterval(tInt);tLeft=min*60;renderT();
+  tInt=setInterval(()=>{tLeft--;renderT();if(tLeft<=0){clearInterval(tInt);document.getElementById('timer').textContent='⏰ หมดเวลา!'}},1000);
+}
+</script>
+</body>
+</html>
