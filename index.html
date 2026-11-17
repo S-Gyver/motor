@@ -696,9 +696,9 @@ ul{padding-left:1.2em}
         <text x="82" y="76" text-anchor="middle" fill="#b2bec3" font-size="11" font-weight="700" id="sw-txt">สถานะ: ปิด (O)</text>
       </svg>
       <!-- Switch Pins -->
-      <div class="wb-pin" data-pin="S1" style="left:39px;top:114px" title="ขาสวิตช์ 1 (ทองเหลือง)">1</div>
-      <div class="wb-pin" data-pin="S2" style="left:69px;top:116px" title="ขาสวิตช์ 2 (ขากลาง)">2</div>
-      <div class="wb-pin" data-pin="S3" style="left:99px;top:116px" title="ขาสวิตช์ 3 (ขาไฟ)">3</div>
+      <div class="wb-pin" data-pin="S1" style="left:39px;top:114px" title="ขา 1 (สีทอง): ต่อไฟลบ (−) เข้าเพื่อให้ไฟสวิตช์ติด">1</div>
+      <div class="wb-pin" data-pin="S2" style="left:69px;top:116px" title="ขา 2 (ขากลาง): ต่อไฟบวก (+) เข้า">2</div>
+      <div class="wb-pin" data-pin="S3" style="left:99px;top:116px" title="ขา 3 (ขาริม): ต่อไฟบวก (+) ออกไปมอเตอร์">3</div>
       <div class="wb-label">กดลงที่ I = เปิด / กด O = ปิด</div>
     </div>
 
@@ -1259,42 +1259,49 @@ function evalCircuit(){
     return false;
   }
 
-  // Real 3-pin rocker switch mechanics:
-  // Bridge the ONE switch contact pair (S2<->S3, S1<->S2, or S1<->S3) that closes the circuit without shorting B+ to B-!
-  const pairs=[['S2','S3'],['S1','S2'],['S1','S3']];
-  for(const [pA,pB] of pairs){
-    const hasA=adj[pA]&&adj[pA].size>0;
-    const hasB=adj[pB]&&adj[pB].size>0;
-    if(hasA && hasB){
-      const curPlus=reachable(adj,'B+');
-      const curMinus=reachable(adj,'B-');
-      const aIsPlus=curPlus.has(pA), aIsMinus=curMinus.has(pA);
-      const bIsPlus=curPlus.has(pB), bIsMinus=curMinus.has(pB);
-      const wouldShort=(aIsPlus && bIsMinus) || (aIsMinus && bIsPlus);
-      if(!wouldShort){
-        addEdge(adj, pA, pB);
-        break;
-      }
-    }
-  }
+  // Strict 3-pin illuminated rocker switch mechanics:
+  // - Pin 1 (S1, Gold/Brass): Negative (-) supply for internal indicator lamp ONLY (NOT a switch contact!)
+  // - Pin 2 (S2, Center): Positive (+) supply IN
+  // - Pin 3 (S3, Silver): Positive (+) switched OUT to motor
+  // When switch is ON (I), ONLY S2 <-> S3 are bridged! S1 NEVER bridges to S2 or S3.
+  addEdge(adj, 'S2', 'S3');
 
   const activeGraph = swOn ? adj : adjOff;
   const fromPlus=reachable(activeGraph,'B+');
   const fromMinus=reachable(activeGraph,'B-');
 
-  // Check if the 3-pin switch's internal LED/Neon lamp is powered:
-  // Lamp is connected between Pin 1 (S1 brass ground) and Pin 2/3 (switch contact)
-  const swLampLit = swOn && wbVolt>0 && !fromPlus.has('B-') && (
-    (fromMinus.has('S1') && (fromPlus.has('S2') || fromPlus.has('S3'))) ||
-    (fromPlus.has('S1') && (fromMinus.has('S2') || fromMinus.has('S3')))
-  );
-  if(swOn && swTxt){
-    if(swLampLit){
-      if(swComp) swComp.classList.add('sw-lit');
-      swTxt.textContent='💡 เปิด (I) ไฟสวิตช์ติด!';
+  // Check if flipping the switch ON causes a short circuit between B+ and B- (e.g. B+ on S2 and B- on S3)
+  if(fromPlus.has('B-') && wbVolt>0){
+    st.style.background='#ff7675';
+    st.style.color='#fff';
+    st.textContent='💥 ไฟฟ้าลัดวงจรเมื่อเปิดสวิตช์! (ห้ามต่อไฟ + และไฟ − เข้าขา 2 กับขา 3 ชนกันโดยไม่ผ่านมอเตอร์)';
+    return false;
+  }
+
+  // Internal switch lamp is connected between Pin 3 (S3, lamp +) and Pin 1 (S1, lamp - ground):
+  // - Requires S1 connected to B- (negative) and S3 receiving B+ (positive)
+  // - If wired correctly (B+ -> S2, S3 -> Motor, B- -> S1), S3 gets B+ only when switch is ON (I)
+  // - If wired backwards (B+ -> S3 directly), lamp stays lit even when switch is OFF (O)!
+  const swLampLit = wbVolt>0 && !fromPlus.has('B-') && fromMinus.has('S1') && fromPlus.has('S3');
+  const lampStuckOnWhenOff = !swOn && wbVolt>0 && baseMinus.has('S1') && basePlus.has('S3');
+
+  if(swLampLit){
+    if(swComp) swComp.classList.add('sw-lit');
+  }
+  if(swTxt){
+    if(swOn){
+      if(swLampLit){
+        swTxt.textContent='💡 เปิด (I) ไฟสวิตช์ติด!';
+        swTxt.setAttribute('fill','#ffeaa7');
+      } else {
+        swTxt.textContent='เปิด (I) • ไฟสวิตช์ไม่ติด';
+        swTxt.setAttribute('fill','#b2bec3');
+      }
+    } else if(lampStuckOnWhenOff){
+      swTxt.textContent='⚠️ ปิด (O) แต่ไฟติดค้าง!';
       swTxt.setAttribute('fill','#ffeaa7');
     } else {
-      swTxt.textContent='เปิด (I) • ไฟสวิตช์ไม่ติด';
+      swTxt.textContent='สถานะ: ปิด (O)';
       swTxt.setAttribute('fill','#b2bec3');
     }
   }
@@ -1331,14 +1338,20 @@ function evalCircuit(){
 
     const dirLabel=(m1Plus && m2Minus)?'ตามเข็มนาฬิกา ↻':'ทวนเข็มนาฬิกา ↺';
     let directNote='';
+    const plusInS2OutS3 = basePlus.has('S2') && !basePlus.has('S3');
+    const plusInS3OutS2 = basePlus.has('S3') && !basePlus.has('S2');
     if(!usesSwitch){
       directNote=' (ต่อตรงไม่ผ่านสวิตช์)';
     } else if(bypassedSwitch){
       directNote=' (⚡ หมุนติดตลอดแม้ปิดสวิตช์ O เพราะจิ้มสายเข้า-ออกที่ขาเดียวกัน!)';
-    } else if(swLampLit){
-      directNote=' (💡 ไฟที่ปุ่มสวิตช์ติดสว่าง เพราะต่อไฟลบเข้าขา 1!)';
+    } else if(swLampLit && plusInS2OutS3){
+      directNote=' (✅ ต่อสวิตช์ถูกหลักเป๊ะ: ขา 1 ไฟลบ, ขา 2 ไฟบวกเข้า, ขา 3 ไฟออก 💡ไฟสวิตช์ติด!)';
+    } else if(swLampLit && plusInS3OutS2){
+      directNote=' (⚠️ มอเตอร์หมุน แต่สลับเอาไฟ + เข้าขา 3 ทำให้ไฟสวิตช์ติดค้างแม้กดปิด O! ควรย้ายไฟ + เข้าขา 2)';
+    } else if(fromPlus.has('S1')){
+      directNote=' (⚠️ มอเตอร์หมุน แต่ไฟสวิตช์ไม่ติดเพราะขา 1 ต้องต่อไฟลบ − เท่านั้น!)';
     } else {
-      directNote=' (🔘 เปิด-ปิดได้ปกติ แต่ไฟในสวิตช์ไม่ติดเพราะไม่ได้ต่อสายลบเข้าขา 1)';
+      directNote=' (🔘 เปิด-ปิดได้ปกติ แต่ไฟในสวิตช์ไม่ติดเพราะยังไม่ได้ต่อไฟลบ − เข้าขา 1)';
     }
 
     if(wbVolt < 1.5){
@@ -1371,18 +1384,41 @@ function evalCircuit(){
     return true;
   }
 
+  // Detect common student miswirings on Pin 1:
+  // Case A: Connected B+ to Pin 1
+  if(basePlus.has('S1')){
+    st.style.background='#fdcb6e';
+    st.style.color='#2d3436';
+    st.textContent='⚠️ ต่อผิดขั้ว! ขา 1 (สีทอง) ต้องต่อไฟลบ (−) เท่านั้น ส่วนไฟบวก (+) ต้องเข้าขา 2 (ขากลาง) แล้วออกขา 3';
+    return false;
+  }
+  // Case B: Used Pin 1 & Pin 2 (or Pin 1 & Pin 3) to try to switch power to motor without using Pin 2 -> Pin 3
+  const s1HasWire = adjOff['S1']&&adjOff['S1'].size>0;
+  const s2HasWire = adjOff['S2']&&adjOff['S2'].size>0;
+  const s3HasWire = adjOff['S3']&&adjOff['S3'].size>0;
+  if(s1HasWire && (!s2HasWire || !s3HasWire) && (adjOff['S1'].has('M1') || adjOff['S1'].has('M2'))){
+    st.style.background='#fdcb6e';
+    st.style.color='#2d3436';
+    st.textContent='⚠️ ขา 1 (สีทอง) คือขั้วไฟลบ (−) ของหลอดไฟสวิตช์ ไม่ใช่ขาตัด-ต่อไฟ! ต้องเอาไฟบวก (+) เข้าขา 2 (กลาง) แล้วออกขา 3 ไปมอเตอร์นะ';
+    return false;
+  }
+
   if(!swOn && readyWhenSwOn){
     st.style.background='#ffeaa7';
     st.style.color='#2d3436';
     st.textContent='✅ ต่อสายครบถูกต้องแล้ว! คลิกกดลงที่ฝั่ง "I" บนสวิตช์สีแดงเพื่อเปิดให้มอเตอร์หมุนเลย!';
+  } else if(swOn && swLampLit){
+    st.style.background='#ffeaa7';
+    st.style.color='#2d3436';
+    st.textContent='💡 ไฟสวิตช์ติดแล้ว! เหลือต่อสายไฟให้ครบเข้าขั้วมอเตอร์ทั้ง 2 ขั้ว (M1 และ M2) มอเตอร์ก็จะหมุนเลย!';
   } else if(!swOn){
     st.style.background='#ffeaa7';
     st.style.color='#2d3436';
-    st.textContent='🔘 ลากสายให้ครบทั้งขั้วบวก (+) และขั้วลบ (−) เข้ามอเตอร์ แล้วกดสวิตช์ฝั่ง "I" นะ!';
+    st.textContent='🔘 หลักการต่อสวิตช์: ขา 1 = ไฟลบ (−) เข้า | ขา 2 (กลาง) = ไฟบวก (+) เข้า | ขา 3 = ไฟออกไปยังมอเตอร์!';
   } else {
     st.style.background='#fdcb6e';
     st.style.color='#2d3436';
-    st.textContent='🔌 วงจรยังไม่ครบ ลองลากสายไฟให้เชื่อมครบทั้งขั้วบวก (+) ไป M1/M2 และขั้วลบ (−) ไปอีกขั้วนะ!';
+    st.textContent='🔌 วงจรยังไม่ครบ! เช็คให้ชัวร์: ขา 1 ต่อไฟลบ (−), ขา 2 ต่อไฟบวก (+), ขา 3 ต่อเข้ามอเตอร์ และอีกขั้วของมอเตอร์กลับเข้าไฟลบ (−)';
   }
   return false;
 }
